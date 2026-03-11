@@ -1,91 +1,231 @@
 "use client"
 
-import { useState } from "react"
-import ISBNInput from "@/components/inventory/ISBNInput"
-import Scanner from "@/components/inventory/Scanner"
-import ProductCard from "@/components/inventory/ProductCard"
-import StockActions from "@/components/inventory/StockActions"
-import LoadingSkeleton from "@/components/inventory/LoadingSkeleton"
-import { sileo } from "sileo"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ScanLine, Keyboard } from "lucide-react"
+import Link from "next/link"
+import { LockKeyhole, Mail, ScanBarcode, ShieldCheck } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 
-export type Product = {
-  id: string
-  name: string
-  isbn: string
-  image: string
-  stock: number
-  sku: string
-}
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
+import { DEMO_ACCOUNT, getAuthSession, loginUser } from "@/lib/demo-auth"
+import { setPendingToast } from "@/lib/pending-toast"
 
-export default function InventoryPage() {
-  const [mode, setMode] = useState<"scan" | "input">("input")
+const homeNotes = [
+  {
+    title: "Clear stock flow",
+    description: "Search a product, update stock, and save the action fast.",
+  },
+  {
+    title: "User action log",
+    description: "See which user added, deducted, or set the stock.",
+  },
+]
+
+export default function LoginPage() {
+  const router = useRouter()
+  const [ready, setReady] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [product, setProduct] = useState<Product | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    identifier: DEMO_ACCOUNT.emailOrUsername,
+    password: DEMO_ACCOUNT.password,
+  })
 
-  const handleISBN = async (isbn: string) => {
-    if (!isbn.trim()) return
-    setProduct(null)
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const activeSession = getAuthSession()
+
+      if (activeSession) {
+        router.replace("/dashboard")
+        return
+      }
+
+      setReady(true)
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [router])
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError(null)
     setLoading(true)
-    try {
-      const res = await fetch(`/api/product?isbn=${isbn}`)
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.message || "Product not found")
-      setProduct(data)
-    } catch (err: any) {
-      sileo.error({ title: "Not Found", description: err.message })
-    } finally {
+
+    await new Promise((resolve) => setTimeout(resolve, 900))
+
+    const result = loginUser(form.identifier, form.password)
+
+    if ("error" in result) {
+      setError(result.error ?? "Login failed. Check your credentials.")
       setLoading(false)
+      return
     }
+
+    setPendingToast({
+      title: "Login successful",
+      description: "Welcome back to the stock workspace.",
+    })
+    router.push("/dashboard")
+  }
+
+  if (!ready) {
+    return (
+      <main className="flex min-h-screen items-center justify-center px-4">
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+          <div className="flex items-center gap-3">
+            <Spinner className="size-4 text-[#009a98]" />
+            Preparing login...
+          </div>
+        </div>
+      </main>
+    )
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-background px-4 py-10">
-      {/* Header */}
-      <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold tracking-tight">
-          📦 Inventory Manager
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Scan or enter an ISBN to manage stock
-        </p>
-      </div>
+    <main className="min-h-screen px-4 py-4 sm:px-6 sm:py-6">
+      <div className="mx-auto max-w-6xl space-y-4">
+        <section className="rounded-3xl bg-[#f4fbfb] p-5 sm:p-6">
+          <div className="space-y-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#009a98]">
+              <ScanBarcode className="h-5 w-5" />
+            </div>
+            <p className="text-xs font-semibold tracking-[0.18em] text-[#009a98] uppercase">
+              Shopline
+            </p>
+            <h1 className="max-w-3xl text-3xl font-semibold text-slate-950 sm:text-4xl">
+              Login to your stock workspace
+            </h1>
+            <p className="max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+              Search products, update quantity, and review user activity from one
+              clear mobile-friendly workspace.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                Search by ISBN
+              </span>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                Scan on mobile
+              </span>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                Track user updates
+              </span>
+            </div>
+          </div>
+        </section>
 
-      {/* Mode Toggle */}
-      <Tabs
-        value={mode}
-        onValueChange={(v) => setMode(v as "scan" | "input")}
-        className="mb-6"
-      >
-        <TabsList>
-          <TabsTrigger value="input">
-            <Keyboard className="mr-2 h-4 w-4" /> Enter ISBN
-          </TabsTrigger>
-          <TabsTrigger value="scan">
-            <ScanLine className="mr-2 h-4 w-4" /> Scan QR
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+        <div className="grid gap-4 lg:grid-cols-[420px_minmax(0,1fr)]">
+          <section className="rounded-3xl bg-white p-5 sm:p-6">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold tracking-[0.18em] text-[#009a98] uppercase">
+                Secure access
+              </p>
+              <h2 className="text-2xl font-semibold text-slate-950">Login</h2>
+              <p className="text-sm leading-6 text-slate-600">
+                Use email or username and password to open the stock workspace.
+              </p>
+            </div>
 
-      {/* Input or Scanner */}
-      <div className="w-full max-w-md">
-        {mode === "input" ? (
-          <ISBNInput onSubmit={handleISBN} loading={loading} />
-        ) : (
-          <Scanner onScan={handleISBN} />
-        )}
-      </div>
+            <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+              <label className="block space-y-2 text-sm font-medium text-slate-700">
+                Email / Username
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    value={form.identifier}
+                    onChange={(event) => {
+                      setForm((current) => ({
+                        ...current,
+                        identifier: event.target.value,
+                      }))
+                      setError(null)
+                    }}
+                    autoComplete="username"
+                    placeholder="admin@shopline.app"
+                    className="h-12 rounded-xl border-slate-200 bg-white pl-11"
+                  />
+                </div>
+              </label>
 
-      {/* Result */}
-      <div className="mt-6 w-full max-w-md">
-        {loading && <LoadingSkeleton />}
-        {product && !loading && (
-          <>
-            <ProductCard product={product} />
-            <StockActions product={product} setProduct={setProduct} />
-          </>
-        )}
+              <label className="block space-y-2 text-sm font-medium text-slate-700">
+                Password
+                <div className="relative">
+                  <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    type="password"
+                    value={form.password}
+                    onChange={(event) => {
+                      setForm((current) => ({
+                        ...current,
+                        password: event.target.value,
+                      }))
+                      setError(null)
+                    }}
+                    autoComplete="current-password"
+                    placeholder="Enter password"
+                    className="h-12 rounded-xl border-slate-200 bg-white pl-11"
+                  />
+                </div>
+              </label>
+
+              {error && (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {error}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                disabled={loading}
+                className="h-12 w-full justify-center rounded-xl bg-[#00cec8] text-center text-slate-950 hover:bg-[#00b8b3]"
+              >
+                {loading ? (
+                  <>
+                    <Spinner className="mr-2 size-4" />
+                    Logging in...
+                  </>
+                ) : (
+                  "Login"
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-4 rounded-2xl bg-[#f4fbfb] px-4 py-3 text-sm leading-6 text-slate-700">
+              Demo account is prefilled. Click login to open the dashboard.
+            </div>
+
+            <p className="mt-4 text-sm text-slate-600">
+              Need a new workspace?{" "}
+              <Link
+                href="/register"
+                className="font-semibold text-[#009a98] hover:text-[#00b8b3]"
+              >
+                Create an account
+              </Link>
+            </p>
+          </section>
+
+          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            {homeNotes.map((note) => (
+              <div
+                key={note.title}
+                className="rounded-3xl bg-white p-5 sm:p-6"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e8f8f8] text-[#009a98]">
+                    <ShieldCheck className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    {note.title}
+                  </h3>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-600">
+                  {note.description}
+                </p>
+              </div>
+            ))}
+          </section>
+        </div>
       </div>
     </main>
   )

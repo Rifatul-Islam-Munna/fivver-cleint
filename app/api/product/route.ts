@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
       sku: "SKU-" + isbn,
     });
 
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ message: "Product not found" }, { status: 404 });
   }
 }

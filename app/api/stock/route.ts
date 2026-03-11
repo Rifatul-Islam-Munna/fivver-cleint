@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ newStock });
 
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ message: "Update failed" }, { status: 500 });
   }
 }

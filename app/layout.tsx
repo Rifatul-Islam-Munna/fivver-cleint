@@ -1,11 +1,15 @@
-import { Geist, Geist_Mono, Inter } from "next/font/google"
+import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google"
 
-import "./globals.css"
+import Providers from "@/components/providers"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils"
-import { Toaster } from "sileo"
-import Providers from "@/components/providers"
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
+
+import "./globals.css"
+
+const fontSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+})
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -25,7 +29,7 @@ export default function RootLayout({
         "antialiased",
         fontMono.variable,
         "font-sans",
-        inter.variable
+        fontSans.variable
       )}
     >
       <body>

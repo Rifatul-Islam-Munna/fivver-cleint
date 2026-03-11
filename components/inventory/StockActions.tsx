@@ -1,27 +1,32 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
+import { Minus, Plus, RefreshCw } from "lucide-react"
 import { sileo } from "sileo"
-import { Plus, Minus, RefreshCw } from "lucide-react"
-import type { Product } from "@/app/page"
+
+import { appendActivityLog, type StockAction } from "@/lib/activity-log"
+import type { Product } from "@/lib/inventory"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 
 type Props = {
   product: Product
   setProduct: (p: Product) => void
+  onActionComplete?: () => void
 }
 
-type Action = "add" | "deduct" | "update"
-
-export default function StockActions({ product, setProduct }: Props) {
+export default function StockActions({
+  product,
+  setProduct,
+  onActionComplete,
+}: Props) {
   const [quantity, setQuantity] = useState("")
-  const [activeAction, setActiveAction] = useState<Action | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const handleAction = async (action: Action) => {
+  const handleAction = async (action: StockAction) => {
     const qty = parseInt(quantity)
+
     if (!qty || qty <= 0) {
       sileo.warning({
         title: "Invalid quantity",
@@ -29,70 +34,107 @@ export default function StockActions({ product, setProduct }: Props) {
       })
       return
     }
+
     if (action === "deduct" && qty > product.stock) {
       sileo.error({
-        title: "Insufficient Stock",
-        description: `Only ${product.stock} units available`,
+        title: "Insufficient stock",
+        description: `Only ${product.stock} units are available.`,
       })
       return
     }
 
     setLoading(true)
+
     try {
-      const res = await fetch("/api/stock", {
+      const response = await fetch("/api/stock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId: product.id, action, quantity: qty }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.message)
+      const data = await response.json()
 
-      setProduct({ ...product, stock: data.newStock })
+      if (!response.ok) {
+        throw new Error(data.message)
+      }
+
+      const updatedProduct = { ...product, stock: data.newStock }
+      setProduct(updatedProduct)
       setQuantity("")
-      setActiveAction(null)
+
+      appendActivityLog({
+        action,
+        quantity: qty,
+        resultingStock: data.newStock,
+        product: updatedProduct,
+      })
+      onActionComplete?.()
+
       sileo.success({
-        title: "Stock Updated",
+        title: "Stock updated",
         description: `New stock: ${data.newStock} units`,
       })
-    } catch (err: any) {
-      sileo.error({ title: "Update Failed", description: err.message })
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Unable to update stock"
+
+      sileo.error({ title: "Update failed", description: message })
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Card>
-      <CardContent className="space-y-3 p-4">
-        <Input
-          type="number"
-          placeholder="Enter quantity..."
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-          min={1}
-        />
-        <div className="grid grid-cols-3 gap-2">
+    <Card className="bg-white">
+      <CardContent className="space-y-4 p-4">
+        <div className="space-y-1">
+          <h3 className="text-lg font-semibold text-slate-900">
+            Update quantity
+          </h3>
+          <p className="text-sm leading-6 text-slate-600">
+            Enter a quantity, then choose the action.
+          </p>
+        </div>
+
+        <label className="block space-y-2 text-sm font-medium text-slate-700">
+          Quantity
+          <Input
+            type="number"
+            placeholder="Enter quantity"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            min={1}
+            className="h-12 rounded-xl border-slate-200 bg-white px-4"
+          />
+        </label>
+
+        <div className="grid gap-2 sm:grid-cols-3">
           <Button
             onClick={() => handleAction("add")}
             disabled={loading}
-            variant="default"
-            className="bg-green-600 hover:bg-green-700"
+            className="h-11 w-full justify-center rounded-xl bg-[#00cec8] px-4 text-center text-slate-950 hover:bg-[#00b8b3]"
           >
-            <Plus className="mr-1 h-4 w-4" /> Add
+            <Plus className="mr-2 h-4 w-4" />
+            Add
           </Button>
+
           <Button
             onClick={() => handleAction("deduct")}
             disabled={loading}
-            variant="destructive"
+            variant="outline"
+            className="h-11 w-full justify-center rounded-xl border-rose-100 bg-rose-50 px-4 text-center text-rose-700 hover:bg-rose-100"
           >
-            <Minus className="mr-1 h-4 w-4" /> Deduct
+            <Minus className="mr-2 h-4 w-4" />
+            Deduct
           </Button>
+
           <Button
             onClick={() => handleAction("update")}
             disabled={loading}
             variant="outline"
+            className="h-11 w-full justify-center rounded-xl border-slate-200 bg-slate-50 px-4 text-center text-slate-700 hover:bg-slate-100"
           >
-            <RefreshCw className="mr-1 h-4 w-4" /> Set
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Update
           </Button>
         </div>
       </CardContent>
